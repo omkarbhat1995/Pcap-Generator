@@ -1,5 +1,4 @@
 """
-src/feature_extractor.py
 Reads raw PCAP files and extracts time-series flow statistics.
 """
 import os

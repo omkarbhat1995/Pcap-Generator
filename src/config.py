@@ -1,5 +1,4 @@
 """
-src/config.py
 Central configuration for paths, model parameters, and network settings.
 """
 import os
