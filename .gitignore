@@ -1,0 +1,27 @@
+# Python standard ignores
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Virtual Environments
+venv/
+env/
+.venv/
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+
+# Project specific: Ignore massive data and model files
+data/raw_pcaps/*
+data/processed_flows/*
+models/*.h5
+models/*.pt
+models/*.pkl
+
+# Exception: Keep the directory structure for data and models
+!data/raw_pcaps/.gitkeep
+!data/processed_flows/.gitkeep
+!models/.gitkeep
