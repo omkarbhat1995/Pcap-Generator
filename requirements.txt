@@ -1,16 +1,6 @@
-# Networking and Packet Crafting
-scapy
-
-# Data Processing and Extraction
-pandas
-numpy
-
-# Machine Learning
-tensorflow
-torch
-scikit-learn
-
-# Jupyter for EDA
-jupyterlab
-matplotlib
-seaborn
+joblib==1.5.3
+numpy==2.5.1
+pandas==3.0.3
+scapy==2.7.0
+scikit_learn==1.9.0
+tensorflow==2.21.0
