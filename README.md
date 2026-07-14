@@ -65,7 +65,9 @@ Expected Output: Creates ```working_processed.csv```, ```streaming_processed.csv
 
 ### Step 4: Model Training
 Train the LSTM neural networks to learn the behavioral patterns of each profile.
+
 python ```src/train.py```
+
 (Note: You will need to edit the ```if __name__ == "__main__":``` block in the script to loop through all three profiles, or pass them via command line arguments).
 Expected Output: Saves ```.h5``` model files and ```.pkl``` scaler files into the ```models/``` directory.
 
@@ -73,10 +75,12 @@ Expected Output: Saves ```.h5``` model files and ```.pkl``` scaler files into th
 Use the trained models to generate completely new, artificial sequences of traffic metadata.
 
 ```python src/generator.py```
+
 Expected Output: Creates synthetic_<mode>_flow.csv inside data/processed_flows/.
 
 ### Step 6: PCAP Crafting
 Convert the generated synthetic metadata back into mathematically valid, Wireshark-readable ```.pcap``` files.
 
 ```python src/pcap_crafter.py```
+
 Expected Output: Generates the final ```final_synthetic_<mode>.pcap``` files in the root directory of the project.
