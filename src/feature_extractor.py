@@ -1,68 +1,95 @@
 """
-Reads raw PCAP files and extracts time-series flow statistics.
+src/feature_extractor.py
+Reads directories of PCAP/PCAPNG files and extracts time-series flow statistics.
 """
-import os
 import pandas as pd
+from pathlib import Path
 from scapy.all import rdpcap, IP, TCP, UDP
-from scapy.layers.inet import IP, TCP, UDP
-from scapy.utils import wrpcap
-from config import RAW_PCAP_DIR, PROCESSED_FLOWS_DIR
+from config import RAW_PCAP_DIR, PROCESSED_FLOWS_DIR, FILE_MAPPINGS
 
-def extract_features(pcap_filename, mode_label):
-    """
-    Parses a PCAP file and extracts [Timestamp, Protocol, Packet_Size, Direction].
-    """
-    pcap_path = RAW_PCAP_DIR / pcap_filename
-    print(f"Loading PCAP: {pcap_path} (This might take a minute for large files...)")
-    
+def process_single_pcap(pcap_path):
+    """Extracts features from a single PCAP file."""
+    print(f"  -> Reading {pcap_path.name}...")
     try:
         packets = rdpcap(str(pcap_path))
-    except FileNotFoundError:
-        print(f"Error: Could not find {pcap_path}")
-        return None
+    except Exception as e:
+        print(f"  -> Error reading {pcap_path.name}: {e}")
+        return []
 
     flow_data = []
-    
-    # Optional: Grab the first IP to loosely determine "direction" (internal vs external)
-    # For a more robust setup, you might want to specify the host IP in config.py
     first_ip = packets[0][IP].src if packets[0].haslayer(IP) else None
 
-    print(f"Extracting features for mode: {mode_label}...")
     for pkt in packets:
         if IP in pkt:
             timestamp = float(pkt.time)
             packet_size = len(pkt)
             
-            # Determine Protocol (TCP = 6, UDP = 17)
             protocol = 'Other'
             if TCP in pkt:
                 protocol = 'TCP'
             elif UDP in pkt:
                 protocol = 'UDP'
                 
-            # Determine Direction (1 for Outbound, 0 for Inbound)
             direction = 1 if pkt[IP].src == first_ip else 0
-            
             flow_data.append([timestamp, protocol, packet_size, direction])
+            
+    return flow_data
+
+def build_profile_dataset(mode_label):
+    """Finds all mapped files for a mode, extracts data, and combines them."""
+    if mode_label not in FILE_MAPPINGS:
+        print(f"Error: Mode '{mode_label}' not defined in config.py")
+        return
+
+    target_substrings = FILE_MAPPINGS[mode_label]
+    if not target_substrings:
+        print(f"Skipping {mode_label}: No file mappings defined.")
+        return
+
+    print(f"\nBuilding dataset for profile: [{mode_label.upper()}]")
+    
+    # Recursively find all .pcap and .pcapng files in the raw_pcaps directory
+    all_files = list(RAW_PCAP_DIR.rglob("*.pcap")) + list(RAW_PCAP_DIR.rglob("*.pcapng"))
+    
+    # Filter files that match this profile's substrings
+    matched_files = []
+    for f in all_files:
+        filename_lower = f.name.lower()
+        if any(sub.lower() in filename_lower for sub in target_substrings):
+            matched_files.append(f)
+
+    if not matched_files:
+        print(f"No matching files found in {RAW_PCAP_DIR} for {mode_label}.")
+        return
+
+    print(f"Found {len(matched_files)} files for {mode_label}.")
+    
+    master_flow_data = []
+    for file_path in matched_files:
+        file_data = process_single_pcap(file_path)
+        master_flow_data.extend(file_data)
+
+    if not master_flow_data:
+        print(f"Failed to extract any usable IP packets for {mode_label}.")
+        return
 
     # Convert to DataFrame
-    df = pd.DataFrame(flow_data, columns=['Timestamp', 'Protocol', 'Packet_Size', 'Direction'])
+    df = pd.DataFrame(master_flow_data, columns=['Timestamp', 'Protocol', 'Packet_Size', 'Direction'])
+    
+    # Sort by timestamp globally (since we merged multiple files)
+    df = df.sort_values(by='Timestamp').reset_index(drop=True)
     
     # Calculate Inter-Arrival Time (IAT)
-    # This is crucial for ML models to learn the "rhythm" of the traffic
     df['IAT'] = df['Timestamp'].diff().fillna(0)
     
     # Save to processed directory
-    output_filename = f"{mode_label}_processed.csv"
-    output_path = PROCESSED_FLOWS_DIR / output_filename
+    output_path = PROCESSED_FLOWS_DIR / f"{mode_label}_processed.csv"
     df.to_csv(output_path, index=False)
     
-    print(f"Successfully extracted {len(df)} packets.")
-    print(f"Saved extracted features to: {output_path}\n")
-    return df
+    print(f"Successfully extracted {len(df)} total packets.")
+    print(f"Saved combined profile to: {output_path}\n")
 
 if __name__ == "__main__":
-    # Example usage: 
-    # Place a file named 'sample_gaming.pcap' in data/raw_pcaps/
-    # extract_features("sample_gaming.pcap", "gaming")
-    print("Feature extractor ready. Call extract_features() with your PCAP file.")
+    # Process both available profiles
+    build_profile_dataset("streaming")
+    build_profile_dataset("working")
